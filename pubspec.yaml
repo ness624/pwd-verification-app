@@ -1,0 +1,69 @@
+name: pwd_verification_app
+description: PWD QR Code Verification App for establishments
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=2.17.0 <3.0.0" # Consider updating SDK constraints if possible, e.g., ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Supabase
+  supabase_flutter: ^2.5.8 # <-- ADD THIS LINE (Check for latest version)
+
+  # UI
+  cupertino_icons: ^1.0.5
+  flutter_svg: ^1.1.6 # Consider updating to latest (^2.x.x)
+  shimmer: ^2.0.0 # Consider updating to latest (^3.x.x)
+  fl_chart: ^0.71.0 # Or latest
+
+  # State Management
+  flutter_bloc: ^8.1.2 # Consider updating to latest (^8.1.x)
+  provider: ^6.0.5 # Consider updating to latest (^6.1.x)
+  equatable: ^2.0.5
+
+  # QR Code Scanning and Generation
+  mobile_scanner: ^3.2.0 # Consider updating to latest (^5.x.x)
+  qr_flutter: ^4.1.0
+
+  # Networking
+  dio: ^5.1.1 # Consider updating to latest (^5.4.x)
+  connectivity_plus: ^4.0.0 # Consider updating to latest (^5.x.x)
+
+  # Storage
+  shared_preferences: ^2.1.0 # Consider updating to latest (^2.2.x)
+  flutter_secure_storage: ^8.0.0 # Consider updating to latest (^9.x.x)
+  sqflite: ^2.2.6 # Consider updating to latest (^2.3.x)
+  path: ^1.8.2
+
+  # Utilities
+  encrypt: ^5.0.1 # Consider updating to latest (^5.0.x)
+  uuid: ^3.0.7 # Consider updating to latest (^4.x.x)
+  intl: ^0.18.0 # Consider updating to latest (^0.19.x)
+  logger: ^1.3.0 # Consider updating to latest (^2.x.x)
+  json_annotation: ^4.8.0 # Consider updating to latest (^4.9.x)
+  permission_handler: ^11.0.0 # Consider updating to latest (^11.3.x)
+
+  # Dependency Injection
+  get_it: ^7.2.0 # Consider updating to latest (^7.7.x)
+  injectable: ^2.1.1 # Consider updating to latest (^2.4.x)
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.1 # Consider updating to latest (^3.x.x or ^4.x.x)
+  build_runner: ^2.3.3 # Consider updating to latest (^2.4.x)
+  json_serializable: ^6.6.1 # Consider updating to latest (^6.8.x)
+  injectable_generator: ^2.1.5 # Consider updating to latest (^2.6.x)
+  flutter_launcher_icons: ^0.13.1
+  mockito: ^5.4.0 # Consider updating to latest (^5.4.x)
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/

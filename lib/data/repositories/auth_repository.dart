@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:pwd_verification_app/core/storage/secure_storage.dart';
 import 'package:pwd_verification_app/core/utils/logger.dart';
-import 'package:pwd_verification_app/data/models/user.dart' as AppUser; // Use prefix
+import 'package:pwd_verification_app/data/models/user.dart' as AppUser;
 
 class AuthRepository {
   static const String _userKey = 'current_app_user';
@@ -12,8 +12,9 @@ class AuthRepository {
 
   AuthRepository(this._supabaseClient, this._secureStorage);
 
-  // Make client accessible to AuthBloc listener if needed (alternative to direct injection)
-  // SupabaseClient get supabaseClient => _supabaseClient;
+  // Make client accessible to AuthBloc listener
+  SupabaseClient get supabaseClient => _supabaseClient;
+
 
   Future<AppUser.User?> login(String email, String password) async {
     if (email.isEmpty || password.isEmpty) throw Exception('Email and password cannot be empty.');
@@ -24,48 +25,43 @@ class AuthRepository {
         email: email.trim(), password: password,
       );
 
-      final supabaseUser = res.user;
-      if (supabaseUser == null) throw Exception('Login completed but user data is missing from Supabase.');
-      AppLogger.info('AuthRepository', 'Supabase login successful for user ID: ${supabaseUser.id}');
+      final supabaseAuthUser = res.user;
+      if (supabaseAuthUser == null) throw Exception('Login completed but Supabase auth user data is missing.');
+      AppLogger.info('AuthRepository', 'Supabase login successful for auth user ID: ${supabaseAuthUser.id}');
 
-      final profileData = await _fetchUserProfile(supabaseUser.id);
-      if (profileData == null) {
-        await logout(); // Clean up inconsistent state
-        throw Exception('Login successful, but failed to retrieve user profile.');
+      final mobileUserProfileData = await _fetchMobileUserProfile(supabaseAuthUser.id);
+      if (mobileUserProfileData == null) {
+        await _supabaseClient.auth.signOut(); // Sign out if profile is missing to prevent partial login
+        throw Exception('Login successful, but failed to retrieve mobile user profile. Please ensure a profile exists for this user.');
       }
 
-      // --- Map profile data to AppUser.User ---
-      // IMPORTANT: Ensure profileData keys ('username', 'full_name', 'role', etc.)
-      // EXACTLY match your Supabase 'profiles' table column names.
       final appUser = AppUser.User(
-        id: supabaseUser.id,
-        email: supabaseUser.email, // Use nullable email from Supabase
-        username: profileData['username'], // Get username from profile (make sure column exists)
-        fullName: profileData['full_name'] ?? 'N/A', // Get full_name from profile
-        role: AppUser.UserRole.values.firstWhere( // Parse role from profile
-          (e) => e.name == profileData['role'],
-          orElse: () => AppUser.UserRole.unknown
-        ),
-        establishmentId: profileData['establishment_id'] ?? '', // Get establishment_id
-        establishmentName: profileData['establishment_name'] ?? '', // Get establishment_name
-        lastLoginTime: supabaseUser.lastSignInAt != null // Use Supabase lastSignInAt
-            ? DateTime.tryParse(supabaseUser.lastSignInAt!)
-            : null,
-        // Add other fields if necessary
+        id: supabaseAuthUser.id, // This is the auth.users.id (User UID from Supabase Auth)
+        email: supabaseAuthUser.email,
+        username: null, // Not available in mobile_users table as per current schema
+        fullName: mobileUserProfileData['full_name'] ?? 'N/A',
+        role: AppUser.UserRole.unknown, // Not available in mobile_users table as per current schema
+        establishmentId: mobileUserProfileData['id'], // This is mobile_users.id (PK of mobile_users table)
+        establishmentName: mobileUserProfileData['organization_name'] ?? 'Default Establishment',
+        lastLoginTime: mobileUserProfileData['last_login_at'] != null
+            ? DateTime.tryParse(mobileUserProfileData['last_login_at'])
+            : (supabaseAuthUser.lastSignInAt != null ? DateTime.tryParse(supabaseAuthUser.lastSignInAt!) : null),
       );
 
       await _secureStorage.write(_userKey, jsonEncode(appUser.toJson()));
       AppLogger.info('AuthRepository', 'App user profile saved to secure storage.');
       return appUser;
 
-    } on AuthException catch (e) { /* Keep previous AuthException handling */
+    } on AuthException catch (e) {
         AppLogger.error('AuthRepository', 'Supabase AuthException: ${e.statusCode} ${e.message}');
         if (e.message.toLowerCase().contains('invalid login credentials')) { throw Exception('Invalid email or password.'); }
         else if (e.message.toLowerCase().contains('email not confirmed')) { throw Exception('Please confirm your email address first.'); }
         throw Exception('Login failed: ${e.message}');
-    } catch (e) { /* Keep previous generic error handling */
+    } catch (e) {
         AppLogger.error('AuthRepository', 'Generic login error: $e');
-        if (e is Exception && e.toString().contains('failed to retrieve user profile')) { rethrow; }
+        if (e is Exception && (e.toString().contains('failed to retrieve mobile user profile') || e.toString().contains('Invalid email or password'))) {
+          rethrow; // Re-throw specific known errors
+        }
         throw Exception('An unexpected error occurred during login.');
     }
   }
@@ -76,12 +72,12 @@ class AuthRepository {
       await _supabaseClient.auth.signOut();
     } on AuthException catch (e) {
       AppLogger.error('AuthRepository', 'Supabase AuthException during logout: ${e.message}');
-      throw Exception('Logout failed: ${e.message}');
+      // Still proceed to clear local data even if Supabase logout fails
     } catch (e) {
       AppLogger.error('AuthRepository', 'Generic logout error: $e');
-      throw Exception('An unexpected error occurred during logout.');
+      // Still proceed to clear local data
     } finally {
-      await _secureStorage.delete(_userKey); // Always clear local data
+      await _secureStorage.delete(_userKey);
       AppLogger.info('AuthRepository', 'Local app user data cleared after logout attempt.');
     }
   }
@@ -89,8 +85,8 @@ class AuthRepository {
   Future<AppUser.User?> getCurrentUser() async {
     try {
       final currentSession = _supabaseClient.auth.currentSession;
-      final supabaseUser = _supabaseClient.auth.currentUser;
-      if (currentSession == null || supabaseUser == null) {
+      final supabaseAuthUser = _supabaseClient.auth.currentUser;
+      if (currentSession == null || supabaseAuthUser == null) {
         await _secureStorage.delete(_userKey); return null;
       }
 
@@ -98,23 +94,26 @@ class AuthRepository {
       if (userJson != null) {
         try {
           final storedUser = AppUser.User.fromJson(jsonDecode(userJson));
-          if (storedUser.id == supabaseUser.id) return storedUser;
+          if (storedUser.id == supabaseAuthUser.id) return storedUser;
           else await _secureStorage.delete(_userKey);
         } catch (e) { await _secureStorage.delete(_userKey); }
       }
 
-      AppLogger.info('AuthRepository', 'Fetching profile from Supabase for getCurrentUser...');
-      final profileData = await _fetchUserProfile(supabaseUser.id);
-      if (profileData == null) return null; // Cannot proceed without profile
+      AppLogger.info('AuthRepository', 'Fetching mobile user profile from Supabase for getCurrentUser...');
+      final mobileUserProfileData = await _fetchMobileUserProfile(supabaseAuthUser.id);
+      if (mobileUserProfileData == null) return null;
 
       final appUser = AppUser.User(
-         id: supabaseUser.id, email: supabaseUser.email,
-         username: profileData['username'],
-         fullName: profileData['full_name'] ?? 'N/A',
-         role: AppUser.UserRole.values.firstWhere((e) => e.name == profileData['role'], orElse: () => AppUser.UserRole.unknown),
-         establishmentId: profileData['establishment_id'] ?? '',
-         establishmentName: profileData['establishment_name'] ?? '',
-         lastLoginTime: supabaseUser.lastSignInAt != null ? DateTime.tryParse(supabaseUser.lastSignInAt!) : null,
+         id: supabaseAuthUser.id,
+         email: supabaseAuthUser.email,
+         username: null,
+         fullName: mobileUserProfileData['full_name'] ?? 'N/A',
+         role: AppUser.UserRole.unknown,
+         establishmentId: mobileUserProfileData['id'],
+         establishmentName: mobileUserProfileData['organization_name'] ?? '',
+         lastLoginTime: mobileUserProfileData['last_login_at'] != null
+            ? DateTime.tryParse(mobileUserProfileData['last_login_at'])
+            : (supabaseAuthUser.lastSignInAt != null ? DateTime.tryParse(supabaseAuthUser.lastSignInAt!) : null),
        );
        await _secureStorage.write(_userKey, jsonEncode(appUser.toJson()));
        return appUser;
@@ -125,25 +124,27 @@ class AuthRepository {
     }
   }
 
-  Future<Map<String, dynamic>?> _fetchUserProfile(String userId) async {
+  Future<Map<String, dynamic>?> _fetchMobileUserProfile(String authUserIdFromSupabase) async {
      try {
-        // Try removing the explicit type first. If it still fails, there might be a deeper issue.
-        final profileResponse = await _supabaseClient
-            .from('profiles') // YOUR PROFILES TABLE NAME
-            .select() // REMOVED <Map<String, dynamic>> temporarily
-            .eq('id', userId)
-            .single();
-         // Ensure the response is actually a Map before returning
-         if (profileResponse is Map<String, dynamic>) {
-             return profileResponse;
+        AppLogger.info('AuthRepository', 'Fetching mobile_user profile for auth_id: $authUserIdFromSupabase');
+        final List<Map<String, dynamic>> profileResponse = await _supabaseClient
+            .from('mobile_users')
+            .select() // Select all columns
+            .eq('auth_id', authUserIdFromSupabase); // Query by the auth_id foreign key
+
+         if (profileResponse.isNotEmpty) {
+             AppLogger.info('AuthRepository', 'Mobile user profile found: ${profileResponse.first}');
+             return profileResponse.first; // Return the first match
          } else {
-             AppLogger.error('AuthRepository', 'Profile fetch response was not a Map: $profileResponse');
+             AppLogger.warning('AuthRepository', 'No mobile_user profile found for auth_id: $authUserIdFromSupabase');
              return null;
          }
-      } on PostgrestException catch (e) { /* Keep previous handling */
-         AppLogger.error('AuthRepository', 'PostgrestException fetching profile for $userId: ${e.message} (Code: ${e.code})'); return null;
-      } catch (e) { /* Keep previous handling */
-         AppLogger.error('AuthRepository', 'Unexpected error fetching profile for $userId: $e'); return null;
+      } on PostgrestException catch (e) {
+         AppLogger.error('AuthRepository', 'PostgrestException fetching mobile_user profile for auth_id $authUserIdFromSupabase: ${e.message} (Code: ${e.code})');
+         return null;
+      } catch (e) {
+         AppLogger.error('AuthRepository', 'Unexpected error fetching mobile_user profile for auth_id $authUserIdFromSupabase: $e');
+         return null;
       }
   }
 }

@@ -86,9 +86,49 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextFormField( controller: _emailController, decoration: const InputDecoration( labelText: 'Email', prefixIcon: Icon(Icons.email), border: OutlineInputBorder(), ), keyboardType: TextInputType.emailAddress, textInputAction: TextInputAction.next, validator: (value) { if (value == null || value.isEmpty) return 'Please enter your email'; if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) return 'Please enter a valid email'; return null; }, enabled: !isLoading, ),
+          TextFormField(
+            controller: _emailController,
+            decoration: const InputDecoration(
+              labelText: 'Email',
+              prefixIcon: Icon(Icons.email),
+              border: OutlineInputBorder(),
+              helperText: 'Enter your registered email address',
+            ),
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            validator: (value) {
+              if (value == null || value.isEmpty) return 'Please enter your email';
+              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) return 'Please enter a valid email';
+              return null;
+            },
+            enabled: !isLoading,
+          ),
           const SizedBox(height: 16),
-          TextFormField( controller: _passwordController, decoration: InputDecoration( labelText: 'Password', prefixIcon: const Icon(Icons.lock), border: const OutlineInputBorder(), suffixIcon: IconButton( icon: Icon( _obscurePassword ? Icons.visibility : Icons.visibility_off, ), onPressed: () => setState(() => _obscurePassword = !_obscurePassword), ), ), obscureText: _obscurePassword, textInputAction: TextInputAction.done, validator: (value) { if (value == null || value.isEmpty) return 'Please enter your password'; return null; }, onFieldSubmitted: (_) { if (!isLoading) _attemptLogin(context); }, enabled: !isLoading, ),
+          TextFormField(
+            controller: _passwordController,
+            decoration: InputDecoration(
+              labelText: 'Password',
+              prefixIcon: const Icon(Icons.lock),
+              border: const OutlineInputBorder(),
+              helperText: 'Enter your password (min. 10 characters)',
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                ),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              ),
+            ),
+            obscureText: _obscurePassword,
+            textInputAction: TextInputAction.done,
+            validator: (value) {
+              if (value == null || value.isEmpty) return 'Please enter your password';
+              return null;
+            },
+            onFieldSubmitted: (_) {
+              if (!isLoading) _attemptLogin(context);
+            },
+            enabled: !isLoading,
+          ),
           const SizedBox(height: 24),
           AppButton( // This line uses AppButton
             label: isLoading ? 'Logging In...' : 'Login',
@@ -97,7 +137,23 @@ class _LoginScreenState extends State<LoginScreen> {
             icon: isLoading ? null : Icons.login,
           ),
           const SizedBox(height: 16),
-          TextButton( onPressed: isLoading ? null : () { /* TODO: Implement forgot password */ }, child: const Text('Forgot Password?'), ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              TextButton(
+                onPressed: isLoading ? null : () {
+                  /* TODO: Implement forgot password */
+                },
+                child: const Text('Forgot Password?'),
+              ),
+              TextButton(
+                onPressed: isLoading ? null : () {
+                  Navigator.pushReplacementNamed(context, '/register');
+                },
+                child: const Text('Create Account'),
+              ),
+            ],
+          ),
         ],
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pwd_verification_app/data/models/scan_result.dart';
 import 'package:pwd_verification_app/presentation/screens/auth/login_screen.dart';
+import 'package:pwd_verification_app/presentation/screens/auth/register_screen.dart';
 import 'package:pwd_verification_app/presentation/screens/home/home_screen.dart';
 import 'package:pwd_verification_app/presentation/screens/scan/scan_history_screen.dart';
 import 'package:pwd_verification_app/presentation/screens/scan/scan_screen.dart';
@@ -8,7 +9,6 @@ import 'package:pwd_verification_app/presentation/screens/scan/verification_resu
 import 'package:pwd_verification_app/presentation/screens/scan/manual_entry_screen.dart';
 import 'package:pwd_verification_app/presentation/screens/settings/settings_screen.dart';
 import 'package:pwd_verification_app/presentation/screens/splash_screen.dart';
-import 'package:pwd_verification_app/presentation/screens/tools/qr_generator_screen.dart';
 
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -18,6 +18,9 @@ class AppRouter {
         
       case '/login':
         return MaterialPageRoute(builder: (_) => const LoginScreen());
+      
+      case '/register':
+        return MaterialPageRoute(builder: (_) => const RegisterScreen());
         
       case '/home':
         return MaterialPageRoute(builder: (_) => const HomeScreen());
@@ -34,9 +37,6 @@ class AppRouter {
       case '/manual_entry':
         return MaterialPageRoute(builder: (_) => const ManualEntryScreen());
       
-      case '/qr_generator':
-        return MaterialPageRoute(builder: (_) => const QrGeneratorScreen());
-        
       case '/verification_result':
         final scanResult = settings.arguments as ScanResult;
         return MaterialPageRoute(

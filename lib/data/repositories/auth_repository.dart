@@ -15,6 +15,104 @@ class AuthRepository {
   // Make client accessible to AuthBloc listener
   SupabaseClient get supabaseClient => _supabaseClient;
 
+  Future<void> register({
+    required String email,
+    required String password,
+    required String fullName, 
+    required String phoneNumber,
+    required String organizationName,
+    required String organizationType,
+  }) async {
+    // Validate email and password
+    if (email.isEmpty) {
+      throw Exception('Email cannot be empty.');
+    }
+    
+    if (password.isEmpty) {
+      throw Exception('Password cannot be empty.');
+    }
+    
+    // Validate email format
+    if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
+      throw Exception('Please enter a valid email address.');
+    }
+
+    // Validate password requirements
+    if (password.length < 10) {
+      throw Exception('Password must be at least 10 characters.');
+    }
+    
+    if (!RegExp(r'[A-Z]').hasMatch(password)) {
+      throw Exception('Password must contain at least one uppercase letter.');
+    }
+    
+    if (!RegExp(r'[0-9]').hasMatch(password)) {
+      throw Exception('Password must contain at least one number.');
+    }
+    
+    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password)) {
+      throw Exception('Password must contain at least one symbol.');
+    }
+    
+    // Validate phone number
+    if (!RegExp(r'^\+?[0-9]{10,15}$').hasMatch(phoneNumber)) {
+      throw Exception('Please enter a valid phone number (10-15 digits).');
+    }
+    
+    try {
+      AppLogger.info('AuthRepository', 'Attempting to register user with email: $email');
+      
+      // 1. Create auth user
+      final AuthResponse res = await _supabaseClient.auth.signUp(
+        email: email.trim(),
+        password: password,
+      );
+      
+      final supabaseAuthUser = res.user;
+      if (supabaseAuthUser == null) {
+        throw Exception('Registration completed but Supabase auth user data is missing.');
+      }
+      
+      AppLogger.info('AuthRepository', 'Supabase auth user created successfully for ID: ${supabaseAuthUser.id}');
+      
+      // 2. Create mobile_user profile
+      try {
+        final mobileUserResponse = await _supabaseClient.from('mobile_users').insert({
+          'auth_id': supabaseAuthUser.id,
+          'full_name': fullName,
+          'email': email.trim(),
+          'phone_number': phoneNumber,
+          'status': 'active', // default status
+          'organization_name': organizationName,
+          'organization_type': organizationType,
+        }).select();
+        
+        AppLogger.info('AuthRepository', 'Mobile user profile created: $mobileUserResponse');
+      } catch (e) {
+        // If profile creation fails, clean up by deleting the auth user
+        await _supabaseClient.auth.admin.deleteUser(supabaseAuthUser.id);
+        AppLogger.error('AuthRepository', 'Failed to create mobile user profile, auth user deleted: $e');
+        throw Exception('Failed to create user profile. Please try again.');
+      }
+      
+      // Sign out after registration since user needs to confirm email
+      await _supabaseClient.auth.signOut();
+      AppLogger.info('AuthRepository', 'User signed out after registration. Email confirmation required.');
+      
+    } on AuthException catch (e) {
+      AppLogger.error('AuthRepository', 'Supabase AuthException during registration: ${e.message}');
+      if (e.message.toLowerCase().contains('email taken')) {
+        throw Exception('This email is already registered. Please use a different email or try logging in.');
+      }
+      throw Exception('Registration failed: ${e.message}');
+    } catch (e) {
+      if (e is Exception && e.toString().contains('Failed to create user profile')) {
+        rethrow; // Re-throw specific known errors
+      }
+      AppLogger.error('AuthRepository', 'Generic registration error: $e');
+      throw Exception('An unexpected error occurred during registration.');
+    }
+  }
 
   Future<AppUser.User?> login(String email, String password) async {
     if (email.isEmpty || password.isEmpty) throw Exception('Email and password cannot be empty.');

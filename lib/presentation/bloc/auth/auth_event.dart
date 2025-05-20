@@ -18,6 +18,27 @@ class LoginEvent extends AuthEvent {
   List<Object?> get props => [username, password];
 }
 
+class RegisterEvent extends AuthEvent {
+  final String email;
+  final String password;
+  final String fullName;
+  final String phoneNumber;
+  final String organizationName;
+  final String organizationType;
+  
+  const RegisterEvent({
+    required this.email,
+    required this.password,
+    required this.fullName,
+    required this.phoneNumber,
+    required this.organizationName,
+    required this.organizationType,
+  });
+  
+  @override
+  List<Object?> get props => [email, password, fullName, phoneNumber, organizationName, organizationType];
+}
+
 class LogoutEvent extends AuthEvent {}
 
 class CheckAuthStatusEvent extends AuthEvent {}

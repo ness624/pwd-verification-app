@@ -24,9 +24,8 @@ dependencies:
   provider: ^6.0.5 # Consider updating to latest (^6.1.x)
   equatable: ^2.0.5
 
-  # QR Code Scanning and Generation
+  # QR Code Scanning
   mobile_scanner: ^3.2.0 # Consider updating to latest (^5.x.x)
-  qr_flutter: ^4.1.0
 
   # Networking
   dio: ^5.1.1 # Consider updating to latest (^5.4.x)
@@ -59,7 +58,6 @@ dev_dependencies:
   json_serializable: ^6.6.1 # Consider updating to latest (^6.8.x)
   injectable_generator: ^2.1.5 # Consider updating to latest (^2.6.x)
   flutter_launcher_icons: ^0.13.1
-  mockito: ^5.4.0 # Consider updating to latest (^5.4.x)
 
 flutter:
   uses-material-design: true

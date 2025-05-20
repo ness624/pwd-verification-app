@@ -18,6 +18,7 @@ class AuthBloc extends Bloc<AuthEvent, local_auth_state.AuthState> {
     on<LogoutEvent>(_onLogout);
     on<CheckAuthStatusEvent>(_onCheckAuthStatus);
     on<AuthServerEventOccurred>(_onAuthServerEventOccurred);
+    on<RegisterEvent>(_onRegister);
 
     _listenToSupabaseAuth();
   }
@@ -42,6 +43,39 @@ class AuthBloc extends Bloc<AuthEvent, local_auth_state.AuthState> {
 
   Future<void> _onLogin( LoginEvent event, Emitter<local_auth_state.AuthState> emit ) async {
     try { emit(local_auth_state.AuthLoading()); final AppUser.User? user = await _authRepository.login( event.username, event.password, ); if (user != null) { emit(local_auth_state.AuthAuthenticated(user)); AppLogger.info('AuthBloc', 'Login successful, user authenticated.'); } else { AppLogger.warning('AuthBloc', 'Repository login returned null unexpectedly.'); emit(const local_auth_state.AuthFailure('Login failed. Please try again.')); } } on AuthException catch (e) { AppLogger.error('AuthBloc', 'AuthException during login: ${e.message}'); emit(local_auth_state.AuthFailure('Login failed: ${e.message}')); } catch (e) { AppLogger.error('AuthBloc', 'Caught generic exception during login: $e'); final message = e.toString().startsWith("Exception: ") ? e.toString().substring(11) : e.toString(); emit(local_auth_state.AuthFailure(message)); }
+  }
+  
+  Future<void> _onRegister(
+    RegisterEvent event,
+    Emitter<local_auth_state.AuthState> emit
+  ) async {
+    try {
+      emit(local_auth_state.AuthLoading());
+      await _authRepository.register(
+        email: event.email,
+        password: event.password,
+        fullName: event.fullName,
+        phoneNumber: event.phoneNumber,
+        organizationName: event.organizationName,
+        organizationType: event.organizationType,
+      );
+      
+      // After successful registration, notify the user
+      emit(const local_auth_state.AuthSuccess('Registration successful! Please check your email to confirm your account before logging in.'));
+      
+      // Return to unauthenticated state so they can log in
+      emit(local_auth_state.AuthUnauthenticated());
+      
+    } on AuthException catch (e) {
+      AppLogger.error('AuthBloc', 'AuthException during registration: ${e.message}');
+      emit(local_auth_state.AuthFailure('Registration failed: ${e.message}'));
+    } catch (e) {
+      AppLogger.error('AuthBloc', 'Caught exception during registration: $e');
+      final message = e.toString().startsWith("Exception: ") 
+          ? e.toString().substring(11) 
+          : e.toString();
+      emit(local_auth_state.AuthFailure(message));
+    }
   }
 
   Future<void> _onLogout( LogoutEvent event, Emitter<local_auth_state.AuthState> emit ) async {
